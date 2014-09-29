@@ -5,7 +5,7 @@
     import numpy as np
     from ... import ndtestfuncs  # this file, ndtestfuncs.py
 
-    funcnames = "ackley ... zakh"
+    funcnames = "ackley ... zakharov"
     dim = 8
     x0 = e.g. np.zeros(dim)
     for func in ndtestfuncs.getfuncs( funcnames ):
@@ -54,6 +54,7 @@ Nd-testfuncs-python.md
 F = Funcmon(func): wrap func() to monitor and plot F.fmem F.xmem F.cost
 """
     # zillions of papers and methods for derivative-free / noisy optimization
+    # scalefuncs(): f.fmax = f( bouds hi ), Funcmon scales
 
 
 #...............................................................................
@@ -66,7 +67,7 @@ try:
 except ImportError:
     Powellsincos = None
 
-__version__ = "2014-09-25 sep denis-bz-py@t-online.de"
+__version__ = "2014-09-29 sep denis-bz-py@t-online.de"
 
 
 #...............................................................................
@@ -75,7 +76,7 @@ def ackley( x, a=20, b=0.2, c=2*pi ):
     n = len(x)
     s1 = sum( x**2 )
     s2 = sum( cos( c * x ))
-    return -a*exp(-b*sqrt(1/n*s1)) - exp(1/n*s2) + a + exp(1)
+    return -a*exp( -b*sqrt( s1 / n )) - exp( s2 / n ) + a + exp(1)
 
 #...............................................................................
 def dixonprice( x ):  # dp.m
@@ -117,8 +118,10 @@ def perm( x, b=.5 ):
     x = np.asarray_chkfinite(x)
     n = len(x)
     j = np.arange( 1., n+1 )
-    return sum( sum( (j**k + b) * ((x / j) ** k - 1) ) **2
-        for k in range( 1, n+1 ))
+    f = 0
+    for k in range( 1, n+1 ):
+        f += sum( (j**k + b) * ((x / j) ** k - 1) ) **2
+    return f
 
 #...............................................................................
 def powell( x ):
@@ -196,7 +199,6 @@ def zakharov( x ):  # zakh.m
     # not in Hedar --
 
 def ellipse( x ):
-    # LN_SBPLX poor ?
     x = np.asarray_chkfinite(x)
     return mean( (1 - x) **2 )  + 100 * mean( np.diff(x) **2 )
 
@@ -249,24 +251,24 @@ name_to_func = { f.__name__ : f for f in allfuncs }
 
     # bounds from Hedar, used for starting random_in_box too --
     # getbounds evals ["-dim", "dim"]
-ackley.bounds       = [-15, 30]
-dixonprice.bounds   = [-10, 10]
-ellipse.bounds      =  [-2, 2]
-griewank.bounds     = [-600, 600]
-levy.bounds         = [-10, 10]
-michalewicz.bounds  = [0, pi]
-nesterov.bounds     = [-2, 2]
-perm.bounds         = ["-dim", "dim"]  # min at [1 2 .. n]
-powell.bounds       = [-4, 5]  # min at tile [3 -1 0 1]
-powellsincos.bounds = [ "-20*pi*dim", "20*pi*dim"]
-powersum.bounds     = [0, "dim"]  # 4d min at [1 2 3 4]
-rastrigin.bounds    = [-5.12, 5.12]
-rosenbrock.bounds   = [-2.4, 2.4]  # wikipedia
-schwefel.bounds     = [-500, 500]
-sphere.bounds       = [-5.12, 5.12]
-sum2.bounds         = [-10, 10]
-trid.bounds         = ["-dim**2", "dim**2"]  # fmin -50 6d, -200 10d
-zakharov.bounds     = [-5, 10]
+ackley._bounds       = [-15, 30]
+dixonprice._bounds   = [-10, 10]
+ellipse._bounds      =  [-2, 2]
+griewank._bounds     = [-600, 600]
+levy._bounds         = [-10, 10]
+michalewicz._bounds  = [0, pi]
+nesterov._bounds     = [-2, 2]
+perm._bounds         = ["-dim", "dim"]  # min at [1 2 .. n]
+powell._bounds       = [-4, 5]  # min at tile [3 -1 0 1]
+powellsincos._bounds = [ "-20*pi*dim", "20*pi*dim"]
+powersum._bounds     = [0, "dim"]  # 4d min at [1 2 3 4]
+rastrigin._bounds    = [-5.12, 5.12]
+rosenbrock._bounds   = [-2.4, 2.4]  # wikipedia
+schwefel._bounds     = [-500, 500]
+sphere._bounds       = [-5.12, 5.12]
+sum2._bounds         = [-10, 10]
+trid._bounds         = ["-dim**2", "dim**2"]  # fmin -50 6d, -200 10d
+zakharov._bounds     = [-5, 10]
 
 #...............................................................................
 def getfuncs( names ):
@@ -287,7 +289,7 @@ def getbounds( funcname, dim ):
     """ "ackley" or ackley -> [-15, 30] """
     funcname = getattr( funcname, "__name__", funcname )
     func = getfuncs( funcname )[0]
-    b = func.bounds
+    b = func._bounds[:]
     if isinstance( b[0], basestring ):  b[0] = eval( b[0] )
     if isinstance( b[1], basestring ):  b[1] = eval( b[1] )
     return b
@@ -312,10 +314,11 @@ if __name__ == "__main__":
         # each func( line [0 0 0 ...] .. upper bound ) --
         # cmp matlab ?
     for dim in dims:
-        print "\n# ndtestfuncs dim %d --" % dim
+        print "\n# ndtestfuncs dim %d  along the diagonal 0 .. high corner --" % dim
 
         for func in allfuncs:
-            steps = np.linspace( 0, getbounds( func, dim )[1], nstep )
+            hibound = getbounds( func, dim )[1]
+            steps = np.linspace( 0, hibound, nstep )
             X = np.outer( steps, np.ones(dim) )  # nstep x dim
             funcname = func.__name__
             if funcname == "powell"  and dim % 4 > 0:
@@ -323,5 +326,5 @@ if __name__ == "__main__":
 
             Y = np.array([ func(x) for x in X ])
             jmin = Y.argmin()
-            print "%-12s %dd: min %6.3g at %.3g \tY %s" % (
-                    funcname, dim, Y[jmin], X[jmin][0], Y)
+            print "%-12s %dd  0 .. %4.3g: min %6.3g at %.3g \tY %s" % (
+                    funcname, dim, hibound, Y[jmin], X[jmin][0], Y)

@@ -29,17 +29,19 @@ Notes
 The values of most of these functions increase as O(dim) or O(dim^2),
 so the convergence curves for dim 5 10 20 ... are not comparable,
 and `ftol_abs` depends on func() scaling.
-Better would be to scale function values to min 1, max 100 for all dimensions.
+Better would be to scale function values to min 1, max 100 in all dimensions.
 Similarly, `xtol_abs` depends on `x` scaling;
-`x` should be scaled to -1 .. 1 for all dimensions.
+`x` should be scaled to -1 .. 1 in all dimensions.
 
-Results from any optimizer depend of course on `ftol_abs xtol_abs maxeval initstep ...`
+Results from any optimizer depend of course on `ftol_abs xtol_abs maxeval ...`
 plus hidden or derived parameters, e.g. BOBYQA rho.
+Methods like Nelder-Mead that track sets of points, starting with `x0 + initstep I`,
+are sensitive to `initstep` / restart initsteps.
 
-Some functions have many local minima or saddle points in higher dimensions,
+Some functions have many local minima or saddle points (more in in higher dimensions ?),
 making the final fmin very sensitive to the starting x0.
 (A rule of thumb: http://en.wikipedia.org/wiki/Wendel%27s_theorem
-suggests that one should take at least 2*dim random x0.)
+suggests that one should take at least 2*dim random x0 ?)
 
 
 See also
@@ -54,7 +56,6 @@ Nd-testfuncs-python.md
 F = Funcmon(func): wrap func() to monitor and plot F.fmem F.xmem F.cost
 """
     # zillions of papers and methods for derivative-free / noisy optimization
-    # scalefuncs(): f.fmax = f( bouds hi ), Funcmon scales
 
 
 #...............................................................................
@@ -67,7 +68,7 @@ try:
 except ImportError:
     Powellsincos = None
 
-__version__ = "2014-09-29 sep denis-bz-py@t-online.de"
+__version__ = "2014-10-08 oct denis-bz-py@t-online.de"
 
 
 #...............................................................................
@@ -219,24 +220,23 @@ allfuncs = [
     ellipse,
     griewank,
     levy,
-    michalewicz,
+    michalewicz,  # min < 0
     nesterov,
     perm,
     powell,
-    # powellsincos,
+    # powellsincos,  # many local mins
     powersum,
     rastrigin,
     rosenbrock,
     schwefel,  # many local mins
     sphere,
     sum2,
-    trid,
+    trid,  # min < 0
     zakharov,
     ]
 
-#...............................................................................
-if Powellsincos is not None:
-    _powellsincos = {}
+if Powellsincos is not None:  # try import
+    _powellsincos = {}  # dim -> func
     def powellsincos( x ):
         x = np.asarray_chkfinite(x)
         n = len(x)
@@ -246,8 +246,13 @@ if Powellsincos is not None:
 
     allfuncs.append( powellsincos )
 
+#...............................................................................
 allfuncnames = " ".join( sorted([ f.__name__ for f in allfuncs ]))
 name_to_func = { f.__name__ : f for f in allfuncs }
+
+def funcnames_minus( minus="powersum sphere sum2 trid zakharov " ):
+    return " ".join( sorted([ f.__name__ for f in allfuncs
+            if f.__name__ not in minus.split() ]))
 
     # bounds from Hedar, used for starting random_in_box too --
     # getbounds evals ["-dim", "dim"]
@@ -312,7 +317,7 @@ if __name__ == "__main__":
 
     #...........................................................................
         # each func( line [0 0 0 ...] .. upper bound ) --
-        # cmp matlab ?
+        # cmp matlab, anyone ?
     for dim in dims:
         print "\n# ndtestfuncs dim %d  along the diagonal 0 .. high corner --" % dim
 
@@ -323,7 +328,6 @@ if __name__ == "__main__":
             funcname = func.__name__
             if funcname == "powell"  and dim % 4 > 0:
                 continue
-
             Y = np.array([ func(x) for x in X ])
             jmin = Y.argmin()
             print "%-12s %dd  0 .. %4.3g: min %6.3g at %.3g \tY %s" % (

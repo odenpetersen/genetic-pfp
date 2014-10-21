@@ -68,7 +68,7 @@ try:
 except ImportError:
     Powellsincos = None
 
-__version__ = "2014-10-08 oct denis-bz-py@t-online.de"
+__version__ = "2014-10-19 oct denis-bz-py@t-online.de"
 
 
 #...............................................................................
@@ -128,9 +128,9 @@ def perm( x, b=.5 ):
 def powell( x ):
     x = np.asarray_chkfinite(x)
     n = len(x)
-    if n % 4 > 0:
-        print "powell: n must be a multiple of 4, not %d" % n
-        return np.NaN
+    n4 = ((n + 3) // 4) * 4
+    if n < n4:
+        x = np.append( x, np.zeros( n4 - n ))
     x = x.reshape(( 4, -1 ))  # 4 rows: x[4i-3] [4i-2] [4i-1] [4i]
     f = np.empty_like( x )
     f[0] = x[0] + 10 * x[1]
@@ -250,10 +250,6 @@ if Powellsincos is not None:  # try import
 allfuncnames = " ".join( sorted([ f.__name__ for f in allfuncs ]))
 name_to_func = { f.__name__ : f for f in allfuncs }
 
-def funcnames_minus( minus="powersum sphere sum2 trid zakharov " ):
-    return " ".join( sorted([ f.__name__ for f in allfuncs
-            if f.__name__ not in minus.split() ]))
-
     # bounds from Hedar, used for starting random_in_box too --
     # getbounds evals ["-dim", "dim"]
 ackley._bounds       = [-15, 30]
@@ -278,9 +274,8 @@ zakharov._bounds     = [-5, 10]
 #...............................................................................
 def getfuncs( names ):
     """ for f in getfuncs( "a b ..." ):
-            f( x )
+            y = f( x )
     """
-        # todo: pat="- ..."
     if names == "*":
         return allfuncs
     funclist = []
@@ -299,13 +294,17 @@ def getbounds( funcname, dim ):
     if isinstance( b[1], basestring ):  b[1] = eval( b[1] )
     return b
 
+def funcnames_minus( minus="powersum sphere sum2 trid zakharov " ):
+    return " ".join( sorted([ f.__name__ for f in allfuncs
+            if f.__name__ not in minus.split() ]))
+
 
 #-------------------------------------------------------------------------------
-if __name__ == "__main__":
+if __name__ == "__main__":  # standalone test --
     import sys
 
     dims = [2, 4, 8]
-    nstep = 6  # 6: 0 .2 .4 .. 1
+    nstep = 11  # 11: 0 .1 .2 .. 1
     seed = 0
 
         # to change these params in sh or ipython, run this.py  a=1  b=None  c=[3] ...
@@ -318,17 +317,18 @@ if __name__ == "__main__":
     #...........................................................................
         # each func( line [0 0 0 ...] .. upper bound ) --
         # cmp matlab, anyone ?
+    steps = np.linspace( 0, 1, nstep )
     for dim in dims:
         print "\n# ndtestfuncs dim %d  along the diagonal 0 .. high corner --" % dim
 
         for func in allfuncs:
-            hibound = getbounds( func, dim )[1]
-            steps = np.linspace( 0, hibound, nstep )
-            X = np.outer( steps, np.ones(dim) )  # nstep x dim
             funcname = func.__name__
-            if funcname == "powell"  and dim % 4 > 0:
-                continue
-            Y = np.array([ func(x) for x in X ])
+            hibound = getbounds( funcname, dim )[1]
+            corner = hibound * np.ones(dim)
+
+            Y = np.array([ func( step * corner ) for step in steps ])
             jmin = Y.argmin()
-            print "%-12s %dd  0 .. %4.3g: min %6.3g at %.3g \tY %s" % (
-                    funcname, dim, hibound, Y[jmin], X[jmin][0], Y)
+            print "%-12s %dd  0 .. %4.3g: min %6.3g  at %4.2g \tY %s" % (
+                    funcname, dim, hibound, Y[jmin], steps[jmin], Y )
+
+    # plot-ndtestfuncs.py

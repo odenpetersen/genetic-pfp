@@ -38,10 +38,9 @@ plus hidden or derived parameters, e.g. BOBYQA rho.
 Methods like Nelder-Mead that track sets of points, starting with `x0 + initstep I`,
 are sensitive to `initstep` / restart initsteps.
 
-Some functions have many local minima or saddle points (more in in higher dimensions ?),
+Some functions have many local minima or saddle points (more in higher dimensions ?),
 making the final fmin very sensitive to the starting x0.
-(A rule of thumb: http://en.wikipedia.org/wiki/Wendel%27s_theorem
-suggests that one should take at least 2*dim random x0 ?)
+*Always* look at a few points near a purported xmin -- cf. nearmin.py .
 
 
 See also
@@ -68,12 +67,12 @@ try:
 except ImportError:
     Powellsincos = None
 
-__version__ = "2014-10-19 oct denis-bz-py@t-online.de"
+__version__ = "2014-10-28 oct denis-bz-py@t-online.de"
 
 
 #...............................................................................
 def ackley( x, a=20, b=0.2, c=2*pi ):
-    x = np.asarray_chkfinite(x)
+    x = np.asarray_chkfinite(x)  # ValueError if any NaN or Inf
     n = len(x)
     s1 = sum( x**2 )
     s2 = sum( cos( c * x ))
@@ -119,10 +118,12 @@ def perm( x, b=.5 ):
     x = np.asarray_chkfinite(x)
     n = len(x)
     j = np.arange( 1., n+1 )
-    f = 0
-    for k in range( 1, n+1 ):
-        f += sum( (j**k + b) * ((x / j) ** k - 1) ) **2
-    return f
+    xbyj = np.fabs(x) / j
+    return mean([ mean( (j**k + b) * (xbyj ** k - 1) ) **2
+            for k in j/n ])
+    # original overflows at n=100 --
+    # return sum([ sum( (j**k + b) * ((x / j) ** k - 1) ) **2
+    #       for k in j ])
 
 #...............................................................................
 def powell( x ):
@@ -158,7 +159,7 @@ def rastrigin( x ):  # rast.m
 #...............................................................................
 def rosenbrock( x ):  # rosen.m
     """ http://en.wikipedia.org/wiki/Rosenbrock_function """
-        # a sum of squares, so scipy.optimize.leastsq (LevMar) is pretty good
+        # a sum of squares, so LevMar (scipy.optimize.leastsq) is pretty good
     x = np.asarray_chkfinite(x)
     x0 = x[:-1]
     x1 = x[1:]
@@ -303,7 +304,7 @@ def funcnames_minus( minus="powersum sphere sum2 trid zakharov " ):
 if __name__ == "__main__":  # standalone test --
     import sys
 
-    dims = [2, 4, 8]
+    dims = [2, 4, 10, 100]
     nstep = 11  # 11: 0 .1 .2 .. 1
     seed = 0
 
@@ -331,4 +332,4 @@ if __name__ == "__main__":  # standalone test --
             print "%-12s %dd  0 .. %4.3g: min %6.3g  at %4.2g \tY %s" % (
                     funcname, dim, hibound, Y[jmin], steps[jmin], Y )
 
-    # plot-ndtestfuncs.py
+    # see plot-ndtestfuncs.py

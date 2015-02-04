@@ -16,7 +16,7 @@ These are the n-dim Matlab functions by A. Hedar (2005), translated to Python-nu
 http://www-optima.amp.i.kyoto-u.ac.jp/member/student/hedar/Hedar_files/TestGO.htm
     ackley.m dp.m griew.m levy.m mich.m perm.m powell.m power.m
     rast.m rosen.m schw.m sphere.m sum2.m trid.m zakh.m
-    + ellipse nesterov powellsincos
+    + ellipse nesterov powellsincos randomquad logsumexp
 
 --------------------------------------------------------------------------------
     All functions appearing in this work are fictitious;
@@ -26,21 +26,30 @@ http://www-optima.amp.i.kyoto-u.ac.jp/member/student/hedar/Hedar_files/TestGO.ht
 Notes
 -----
 
-The values of most of these functions increase as O(dim) or O(dim^2),
+Each `func( x )` works for `x` of any size >= 2
+(mttiw for functions with random state, such as randomquad.)
+Each starts off
+    x = np.asarray_chkfinite(x)  # ValueError if any NaN or Inf
+
+The values of most functions increase as O(dim) or O(dim^2),
 so the convergence curves for dim 5 10 20 ... are not comparable,
 and `ftol_abs` depends on func() scaling.
 Better would be to scale function values to min 1, max 100 in all dimensions.
 Similarly, `xtol_abs` depends on `x` scaling;
 `x` should be scaled to -1 .. 1 in all dimensions.
+(`ftol_rel` and `xtol_rel` can misbehave near 0.)
 
 Results from any optimizer depend of course on `ftol_abs xtol_abs maxeval ...`
 plus hidden or derived parameters, e.g. BOBYQA rho.
 Methods like Nelder-Mead that track sets of points, starting with `x0 + initstep I`,
-are sensitive to `initstep` / restart initsteps.
+are sensitive to `initstep`. And what are `ftol` and `xtol` for sets ?
 
 Some functions have many local minima or saddle points (more in higher dimensions ?),
 making the final fmin very sensitive to the starting x0.
-*Always* look at a few points near a purported xmin -- cf. nearmin.py .
+Also, some have a local minimum at [0 0 ...] so starting there is boring.
+*Always* look at a few points near a purported xmin, e.g. with minnear.py .
+
+Fun constrained problems: min f(x) over the surface of f's bounding box.
 
 
 See also
@@ -54,7 +63,7 @@ nlopt/test/... runs and plots BOBYQA PRAXIS SBPLX ... on these ndtestfuncs
 Nd-testfuncs-python.md
 F = Funcmon(func): wrap func() to monitor and plot F.fmem F.xmem F.cost
 """
-    # zillions of papers and methods for derivative-free / noisy optimization
+    # zillions of papers and methods for derivative-free optimization alone
 
 
 #...............................................................................
@@ -66,8 +75,13 @@ try:
     from opt.testfuncs.powellsincos import Powellsincos
 except ImportError:
     Powellsincos = None
+try:
+    from opt.testfuncs.randomquad import randomquad
+    from opt.testfuncs.logsumexp import logsumexp
+except ImportError:
+    randomquad = logsumexp = None
 
-__version__ = "2014-10-28 oct denis-bz-py@t-online.de"
+__version__ = "2015-02-01 feb  denis-bz-py at t-online.de"  # + randomquad logsumexp
 
 
 #...............................................................................
@@ -105,7 +119,7 @@ def levy( x ):
         +       (z[-1] - 1)**2 * (1 + sin( 2 * pi * z[-1] )**2 ))
 
 #...............................................................................
-michalewicz_m = 2  # orig 10: ^20 tiny, underflow
+michalewicz_m = .5  # orig 10: ^20 => underflow
 
 def michalewicz( x ):  # mich.m
     x = np.asarray_chkfinite(x)
@@ -147,7 +161,7 @@ def powersum( x, b=[8,18,44,114] ):  # power.m
     s = 0
     for k in range( 1, n+1 ):
         bk = b[ min( k - 1, len(b) - 1 )]  # ?
-        s += (sum( x**k ) - bk) **2
+        s += (sum( x**k ) - bk) **2  # dim 10 huge, 100 overflows
     return s
 
 #...............................................................................
@@ -247,6 +261,11 @@ if Powellsincos is not None:  # try import
 
     allfuncs.append( powellsincos )
 
+if randomquad is not None:  # try import
+    allfuncs.append( randomquad )
+    allfuncs.append( logsumexp )
+
+
 #...............................................................................
 allfuncnames = " ".join( sorted([ f.__name__ for f in allfuncs ]))
 name_to_func = { f.__name__ : f for f in allfuncs }
@@ -262,7 +281,6 @@ michalewicz._bounds  = [0, pi]
 nesterov._bounds     = [-2, 2]
 perm._bounds         = ["-dim", "dim"]  # min at [1 2 .. n]
 powell._bounds       = [-4, 5]  # min at tile [3 -1 0 1]
-powellsincos._bounds = [ "-20*pi*dim", "20*pi*dim"]
 powersum._bounds     = [0, "dim"]  # 4d min at [1 2 3 4]
 rastrigin._bounds    = [-5.12, 5.12]
 rosenbrock._bounds   = [-2.4, 2.4]  # wikipedia
@@ -272,8 +290,13 @@ sum2._bounds         = [-10, 10]
 trid._bounds         = ["-dim**2", "dim**2"]  # fmin -50 6d, -200 10d
 zakharov._bounds     = [-5, 10]
 
+logsumexp._bounds   = [-20, 20]  # ?
+powellsincos._bounds = [ "-20*pi*dim", "20*pi*dim"]
+randomquad._bounds   = [-10000, 10000]
+
+
 #...............................................................................
-def getfuncs( names ):
+def getfuncs( names, dim=0 ):
     """ for f in getfuncs( "a b ..." ):
             y = f( x )
     """
@@ -295,7 +318,8 @@ def getbounds( funcname, dim ):
     if isinstance( b[1], basestring ):  b[1] = eval( b[1] )
     return b
 
-def funcnames_minus( minus="powersum sphere sum2 trid zakharov " ):
+_minus = "dixonprice perm powersum schwefel sphere sum2 trid zakharov "  # nlopt all ~ same ?
+def funcnames_minus( minus=_minus ):
     return " ".join( sorted([ f.__name__ for f in allfuncs
             if f.__name__ not in minus.split() ]))
 
@@ -304,32 +328,31 @@ def funcnames_minus( minus="powersum sphere sum2 trid zakharov " ):
 if __name__ == "__main__":  # standalone test --
     import sys
 
-    dims = [2, 4, 10, 100]
+    dims = [2, 4, 10]  # , 100]
     nstep = 11  # 11: 0 .1 .2 .. 1
     seed = 0
 
         # to change these params in sh or ipython, run this.py  a=1  b=None  c=[3] ...
     for arg in sys.argv[1:]:
         exec( arg )
-    np.set_printoptions( 1, threshold=100, edgeitems=10, linewidth=120, suppress=True,
-        formatter = dict( float = lambda x: "%.3g" % x ))  # float arrays %.3g
+
+    np.set_printoptions( threshold=20, edgeitems=5, linewidth=120, suppress=True,
+        formatter = dict( float = lambda x: "%.2g" % x ))  # float arrays %.2g
     np.random.seed(seed)
 
     #...........................................................................
-        # each func( line [0 0 0 ...] .. upper bound ) --
-        # cmp matlab, anyone ?
-    steps = np.linspace( 0, 1, nstep )
     for dim in dims:
-        print "\n# ndtestfuncs dim %d  along the diagonal 0 .. high corner --" % dim
+        print "\n# ndtestfuncs dim %d  along the diagonal low .. high corner --" % dim
+        # cmp matlab, anyone ?
 
         for func in allfuncs:
-            funcname = func.__name__
-            hibound = getbounds( funcname, dim )[1]
-            corner = hibound * np.ones(dim)
+            lo, hi = getbounds( func, dim )
+            steps = np.linspace( lo, hi, nstep )
 
-            Y = np.array([ func( step * corner ) for step in steps ])
+            Y = np.array([ func( t * np.ones(dim) ) for t in steps ])
             jmin = Y.argmin()
-            print "%-12s %dd  0 .. %4.3g: min %6.3g  at %4.2g \tY %s" % (
-                    funcname, dim, hibound, Y[jmin], steps[jmin], Y )
+            Ymin = Y[jmin]
+            print "%-12s %dd  min %-8.3g  at %.3g \t lo hi %4.3g %4.3g \t Y-min %s" % (
+                    func.__name__, dim, Ymin, steps[jmin], lo, hi, Y - Ymin )
 
-    # see plot-ndtestfuncs.py
+    # plot-ndtestfuncs.py

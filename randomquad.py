@@ -5,40 +5,35 @@
         a = d r: d diagonal, r reflect / flip
     ~ Su Boyd Candes, Diff eq modeling Nesterov accelerated gradient, 2014, p. 7
 
-    Randomquad( seed: int / RandomState / env SEED  / 0,
-            eigmin=.001, eigmax=1: logspace
-            or eigenvalues= yours
+    randomquad = Randomquad( seed = int / RandomState / env SEED  / 0,
+            eigmin=.001, eigmax=1,
+            space=np.linspace / your function e.g. _logspace
+    has __call__ and .gradient
 """
-    # how realistic is completely random b, what real problems ?
+    # how realistic is completely random b ?
     # x = A^-1 b = sum ((b . e_i) / lambda_i) e_i  is very sensitive to b
 
 from __future__ import division
 import os
 import numpy as np
 
-__version__ = "2015-02-10 feb  denis-bz-py at t-online dot de"
-
-
-# randomquad = Randomquad() below: call randomquad(x), randomquad.gradient(x)
+__version__ = "2015-02-11 feb  denis-bz-py at t-online dot de"
 
 #...............................................................................
 class Randomquad( object ):
     __doc__ = globals()["__doc__"]
 
-    def __init__( s, seed=None, eigmin=.001, eigmax=1, eigenvalues=None ):
+    def __init__( s, seed=None, eigmin=.001, eigmax=1, space=np.linspace ):
         if seed is None:
             seed = int( os.getenv( "SEED", 0 ))
         if not isinstance(seed, np.random.RandomState):
             seed = np.random.RandomState( seed=seed )
         s.randomstate = seed
-
         s.eigmin, s.eigmax = eigmin, eigmax
         assert eigmin > 0, eigmin
-        if eigenvalues is None:
-            s.u = []  # if len(x) != len(u): initrandom( n )
-        else:
-            s.initrandom( len(eigenvalues), eigenvalues )
-        s.__name__ = "randomquad"
+        s.space = space  # np.linspace / _logspace / user func 
+        s.u = []
+        s.__name__ = "randomquad-%s" % space.__name__
 
     #...........................................................................
     def __call__( s, x ):
@@ -77,17 +72,15 @@ class Randomquad( object ):
         a = (np.eye(n) - 2 * np.outer( s.u, s.u )) * s.d[:,np.newaxis]
         return a.T.dot(a)
 
-    def initrandom( s, n, eigenvalues=None ):
+    def initrandom( s, n, space=None ):
         """ init random u d B b on first call each size """
             # bug: calls 3d 4d 3d again  todo: dict n -> u d B b
         s.u = s.randomstate.normal( size=n )
         s.u /= np.sqrt( s.u .dot(s.u) )
-        if eigenvalues is None:
-            eigenvalues = np.logspace( np.log(s.eigmin), np.log(s.eigmax), num=n, base=np.e )
-            # eigenvalues = np.linspace( s.eigmin, s.eigmax, n )
-        else:
-            assert len(eigenvalues) == n, (len(eigenvalues), n)
-        s.d = np.sqrt( eigenvalues )
+        if space is None:
+            space = s.space
+        s.eigenvalues = space( s.eigmin, s.eigmax, n )  # np.linspace _logspace ...
+        s.d = np.sqrt( s.eigenvalues )
         s.B = s.randomstate.normal( scale=5, size=n )  # grad A x - B = a' (a x - b)
         s.b = s._flip( s.B )
         s.b /= s.d
@@ -95,6 +88,9 @@ class Randomquad( object ):
 
 
 randomquad = Randomquad()  # caller: randomquad(x), randomquad.gradient(x)
+
+def _logspace( lo, hi, n ):
+    return np.logspace( np.log(lo), np.log(hi), num=n, base=np.e )
 
 
 #...............................................................................
@@ -106,15 +102,15 @@ if __name__ == "__main__":
         return "|av| %.3g  max %.3g" % (absx.mean(), absx.max())
 
 #...............................................................................
-    nn = 2 ** np.arange( 3, 3+1 )  # 4, 9+1 )
-    nseed = 1
+    nn = 2 ** np.arange( 3, 4+1 )  # 4, 9+1 )
+    nseed = 2
 
         # to change these params in sh or ipython, run this.py  a=1  b=None  c=[3] ...
     for arg in sys.argv[1:]:
         exec( arg )
 
     np.set_printoptions( threshold=100, edgeitems=3, linewidth=120,
-        formatter = dict( float = lambda x: "%.2g" % x ))  # float arrays %.2g
+        formatter = dict( float = lambda x: "%.3g" % x ))  # float arrays %.3g
 
     def eig( A ):
         print "A:\n", A * 100
@@ -127,17 +123,18 @@ if __name__ == "__main__":
     As = []
     for n in nn:
       for seed in range(nseed):
-        print "\nrandomquad( n %d  seed %d ) --" % (n, seed)
-        randomquad = Randomquad( seed=seed )  # eigenvalues=evals )
+        randomquad = Randomquad( seed=seed, space=_logspace )
+        print "\n%s( seed %d )  n %d --" % (randomquad.__name__, seed, n)
         x = np.zeros(n)
-        f = randomquad( x )
+        f = randomquad( x )  # initrandom( n )
         g = randomquad.gradient( x )
+        print "eigenvalues:", randomquad.eigenvalues
         print "f(0): %.3g" % f
-        print "grad: %s  %s" % (avmax(g), g)
+        print "grad(0): %s  %s" % (avmax(g), g)
         xmin = randomquad.xmin
         print "xmin: %s  %s" % (avmax(xmin), xmin)  # 128: max 6600
         fxmin = randomquad( xmin )
         print "f(xmin): %.3g " % fxmin
         As.append( randomquad._A( n ))
 
-    eig( As[0] )
+    # eig( As[0] )

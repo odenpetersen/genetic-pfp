@@ -7,8 +7,8 @@
 
     randomquad = Randomquad( seed = int / RandomState / env SEED  / 0,
             eigmin=.001, eigmax=1,
-            space=np.linspace / your function e.g. _logspace
-    has __call__ and .gradient
+            space= e.g. np.linspace, default _logspace
+    has __call__ i.e. randomquad(x) and .gradient(x)
 """
     # how realistic is completely random b ?
     # x = A^-1 b = sum ((b . e_i) / lambda_i) e_i  is very sensitive to b
@@ -19,11 +19,15 @@ import numpy as np
 
 __version__ = "2015-02-11 feb  denis-bz-py at t-online dot de"
 
+def _logspace( lo, hi, n ):
+    return np.logspace( np.log(lo), np.log(hi), num=n, base=np.e )
+
+
 #...............................................................................
 class Randomquad( object ):
     __doc__ = globals()["__doc__"]
 
-    def __init__( s, seed=None, eigmin=.001, eigmax=1, space=np.linspace ):
+    def __init__( s, seed=None, eigmin=.001, eigmax=1, space=_logspace ):
         if seed is None:
             seed = int( os.getenv( "SEED", 0 ))
         if not isinstance(seed, np.random.RandomState):
@@ -32,8 +36,8 @@ class Randomquad( object ):
         s.eigmin, s.eigmax = eigmin, eigmax
         assert eigmin > 0, eigmin
         s.space = space  # np.linspace / _logspace / user func 
+        s.__name__ = "randomquad"
         s.u = []
-        s.__name__ = "randomquad-%s" % space.__name__
 
     #...........................................................................
     def __call__( s, x ):
@@ -88,9 +92,6 @@ class Randomquad( object ):
 
 
 randomquad = Randomquad()  # caller: randomquad(x), randomquad.gradient(x)
-
-def _logspace( lo, hi, n ):
-    return np.logspace( np.log(lo), np.log(hi), num=n, base=np.e )
 
 
 #...............................................................................

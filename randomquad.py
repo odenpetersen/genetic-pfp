@@ -7,35 +7,32 @@
 
     randomquad = Randomquad( seed = int / RandomState / env SEED  / 0,
             eigmin=.001, eigmax=1,
-            space= e.g. np.linspace, default _logspace
+            space= np.linspace
     has __call__ i.e. randomquad(x) and .gradient(x)
 """
-    # how realistic is completely random b ?
+    # how realistic is normal-random b ?
     # x = A^-1 b = sum ((b . e_i) / lambda_i) e_i  is very sensitive to b
 
 from __future__ import division
 import os
 import numpy as np
 
-__version__ = "2015-02-11 feb  denis-bz-py at t-online dot de"
-
-def _logspace( lo, hi, n ):
-    return np.logspace( np.log(lo), np.log(hi), num=n, base=np.e )
+__version__ = "2015-02-26 feb  denis-bz-py t-online de"
 
 
 #...............................................................................
 class Randomquad( object ):
     __doc__ = globals()["__doc__"]
 
-    def __init__( s, seed=None, eigmin=.001, eigmax=1, space=_logspace ):
+    def __init__( s, eigmin=.001, eigmax=1, space=np.linspace, seed=None ):
+        assert eigmin > 0, eigmin
+        s.eigmin, s.eigmax = eigmin, eigmax
+        s.space = space  # np.linspace / _logspace / user func 
         if seed is None:
             seed = int( os.getenv( "SEED", 0 ))
-        if not isinstance(seed, np.random.RandomState):
-            seed = np.random.RandomState( seed=seed )
-        s.randomstate = seed
-        s.eigmin, s.eigmax = eigmin, eigmax
-        assert eigmin > 0, eigmin
-        s.space = space  # np.linspace / _logspace / user func 
+        random = seed if isinstance(seed, np.random.RandomState) \
+            else np.random.RandomState( seed=seed )
+        s.random = getattr( random, "normal" )  # "laplace" ...
         s.__name__ = "randomquad"
         s.u = []
 
@@ -79,19 +76,26 @@ class Randomquad( object ):
     def initrandom( s, n, space=None ):
         """ init random u d B b on first call each size """
             # bug: calls 3d 4d 3d again  todo: dict n -> u d B b
-        s.u = s.randomstate.normal( size=n )
+        s.u = s.random( size=n )
         s.u /= np.sqrt( s.u .dot(s.u) )
         if space is None:
             space = s.space
         s.eigenvalues = space( s.eigmin, s.eigmax, n )  # np.linspace _logspace ...
         s.d = np.sqrt( s.eigenvalues )
-        s.B = s.randomstate.normal( scale=5, size=n )  # grad A x - B = a' (a x - b)
+        s.B = s.random( scale=5, size=n )  # grad A x - B = a' (a x - b)
         s.b = s._flip( s.B )
         s.b /= s.d
         s.xmin = s._flip( s.b / s.d )
 
+    def __str__( s ):
+        return "randomquad eigmin %.3g  eigmax %.3g  space %s" % (
+            s.eigmin, s.eigmax, s.space.__name__ )
+
 
 randomquad = Randomquad()  # caller: randomquad(x), randomquad.gradient(x)
+
+def _logspace( lo, hi, n ):
+    return np.logspace( np.log(lo), np.log(hi), num=n, base=np.e )
 
 
 #...............................................................................

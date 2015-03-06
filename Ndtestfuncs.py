@@ -10,7 +10,7 @@
     x0 = e.g. np.zeros(dim)
     for func in ndtestfuncs.getfuncs( funcnames ):
         fmin, xmin = myoptimizer( func, x0 ... )
-        # calls func( x ) with x a 1d numpy array or array-like of any dim >= 2
+        # calls func( x ) with x a 1d numpy array or array-like of any size >= 2
 
 These are the n-dim Matlab functions by A. Hedar (2005), translated to Python-numpy.
 http://www-optima.amp.i.kyoto-u.ac.jp/member/student/hedar/Hedar_files/TestGO.htm
@@ -26,8 +26,7 @@ http://www-optima.amp.i.kyoto-u.ac.jp/member/student/hedar/Hedar_files/TestGO.ht
 Notes
 -----
 
-Each `func( x )` works for `x` of any size >= 2
-(mttiw for functions with random state, such as randomquad.)
+Each `func( x )` works for `x` of any size >= 2.
 Each starts off
     x = np.asarray_chkfinite(x)  # ValueError if any NaN or Inf
 
@@ -37,7 +36,7 @@ and `ftol_abs` depends on func() scaling.
 Better would be to scale function values to min 1, max 100 in all dimensions.
 Similarly, `xtol_abs` depends on `x` scaling;
 `x` should be scaled to -1 .. 1 in all dimensions.
-(`ftol_rel` and `xtol_rel` can misbehave near 0.)
+(`ftol_rel` and `xtol_rel` can misbehave near 0; see `isclose`, abs or rel.)
 
 Results from any optimizer depend of course on `ftol_abs xtol_abs maxeval ...`
 plus hidden or derived parameters, e.g. BOBYQA rho.
@@ -47,7 +46,7 @@ are sensitive to `initstep`. And what are `ftol` and `xtol` for sets ?
 Some functions have many local minima or saddle points (more in higher dimensions ?),
 making the final fmin very sensitive to the starting x0.
 Also, some have a local minimum at [0 0 ...] so starting there is boring.
-*Always* look at a few points near a purported xmin, e.g. with minnear.py .
+*Always* look at a few points near a purported xmin.
 
 Fun constrained problems: min f(x) over the surface of f's bounding box.
 
@@ -81,7 +80,7 @@ try:
 except ImportError:
     randomquad = logsumexp = None
 
-__version__ = "2015-02-01 feb  denis-bz-py at t-online.de"  # + randomquad logsumexp
+__version__ = "2015-03-06 mar  denis-bz-py t-online de"  # + randomquad logsumexp
 
 
 #...............................................................................
@@ -227,6 +226,12 @@ def nesterov( x ):
     return abs( 1 - x[0] ) / 4 \
         + sum( abs( x1 - 2*abs(x0) + 1 ))
 
+#...............................................................................
+def saddle( x ):
+    x = np.asarray_chkfinite(x) - 1
+    return np.mean( np.diff( x **2 )) \
+        + .5 * np.mean( x **4 )
+
 
 #-------------------------------------------------------------------------------
 allfuncs = [
@@ -245,6 +250,7 @@ allfuncs = [
     rosenbrock,
     schwefel,  # many local mins
     sphere,
+    saddle,
     sum2,
     trid,  # min < 0
     zakharov,
@@ -265,20 +271,20 @@ if randomquad is not None:  # try import
     allfuncs.append( randomquad )
     allfuncs.append( logsumexp )
 
+allfuncs.sort( key = lambda f: f.__name__ )
+
 
 #...............................................................................
-allfuncnames = " ".join( sorted([ f.__name__ for f in allfuncs ]))
-name_to_func = { f.__name__ : f for f in allfuncs }
+allfuncnames = " ".join([ f.__name__ for f in allfuncs ])
+name_to_func = { f.__name__ : f  for f in allfuncs }
 
     # bounds from Hedar, used for starting random_in_box too --
     # getbounds evals ["-dim", "dim"]
 ackley._bounds       = [-15, 30]
 dixonprice._bounds   = [-10, 10]
-ellipse._bounds      =  [-2, 2]
 griewank._bounds     = [-600, 600]
 levy._bounds         = [-10, 10]
 michalewicz._bounds  = [0, pi]
-nesterov._bounds     = [-2, 2]
 perm._bounds         = ["-dim", "dim"]  # min at [1 2 .. n]
 powell._bounds       = [-4, 5]  # min at tile [3 -1 0 1]
 powersum._bounds     = [0, "dim"]  # 4d min at [1 2 3 4]
@@ -290,9 +296,12 @@ sum2._bounds         = [-10, 10]
 trid._bounds         = ["-dim**2", "dim**2"]  # fmin -50 6d, -200 10d
 zakharov._bounds     = [-5, 10]
 
-logsumexp._bounds   = [-20, 20]  # ?
+ellipse._bounds      =  [-2, 2]
+logsumexp._bounds    = [-20, 20]  # ?
+nesterov._bounds     = [-2, 2]
 powellsincos._bounds = [ "-20*pi*dim", "20*pi*dim"]
 randomquad._bounds   = [-10000, 10000]
+saddle._bounds       = [-3, 3]
 
 
 #...............................................................................
@@ -318,10 +327,16 @@ def getbounds( funcname, dim ):
     if isinstance( b[1], basestring ):  b[1] = eval( b[1] )
     return b
 
-_minus = "dixonprice perm powersum schwefel sphere sum2 trid zakharov "  # nlopt all ~ same ?
+#...............................................................................
+_minus = "dixonprice perm powersum schwefel sphere sum2 trid zakharov "  # nlopt ~ same ?
+
+def allfuncs_minus( minus=_minus ):
+    return [f for f in allfuncs
+            if f.__name__ not in minus.split() ]
+
 def funcnames_minus( minus=_minus ):
-    return " ".join( sorted([ f.__name__ for f in allfuncs
-            if f.__name__ not in minus.split() ]))
+    return " ".join([ f.__name__
+            for f in allfuncs_minus( minus=minus )])
 
 
 #-------------------------------------------------------------------------------

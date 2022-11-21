@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """ logsumexp ~ Su Boyd Candes, Diff eq modeling Nesterov accelerated gradient, 2014, p. 7
 
     Logsumexp( seed: int / RandomState / env SEED  / 0 )
@@ -81,10 +82,10 @@ if __name__ == "__main__":
 #...............................................................................
     for n in nn:
       for seed in range(nseed):
-        print "\nlogsumexp( n %d  seed %s ) --" % (n, seed)
+        print("\nlogsumexp( n %d  seed %s ) --" % (n, seed))
         logsumexp = Logsumexp( seed=seed )
         x = np.zeros(n)
         f = logsumexp( x )
         g = logsumexp.gradient( x )
-        print "f(0): %.3g" % f
-        print "grad: %s  %s" % (avmax(g), g)
+        print("f(0): %.3g" % f)
+        print("grad: %s  %s" % (avmax(g), g))

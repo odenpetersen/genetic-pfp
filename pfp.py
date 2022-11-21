@@ -23,7 +23,7 @@ def order_inplace(array, utility):
             array[i] = array[i+1].copy()
             array[i+1] = tmp
 
-def run_ga(utility = name_to_func['sphere'], n_population=300, n_params=3, n_generations=300, elite_decay=0.9, noise_decay=0.9):
+def run_ga(utility = name_to_func['sphere'], n_population=200, n_params=1, n_generations=200, elite_decay=0.9997, noise_decay=0.99):
     elite = noise = 1
     population = np.random.normal(size=(n_population, n_params))
 
@@ -41,7 +41,7 @@ def run_ga(utility = name_to_func['sphere'], n_population=300, n_params=3, n_gen
 def make_pfp(filename='pfp.png'):
     #plt.imshow(run_ga(), interpolation='nearest')
     #plt.savefig(filename)
-    imsave(filename,run_ga(),cmap='Greys')
+    imsave(filename,run_ga(),cmap='Spectral')
 
 if __name__=='__main__':
     make_pfp()
